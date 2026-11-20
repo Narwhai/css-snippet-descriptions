@@ -1,0 +1,8 @@
+.css-snippet-description-text {
+  display: block;
+  margin-top: var(--size-4-1);
+}
+
+.css-snippet-description-error {
+  color: var(--text-error);
+}
