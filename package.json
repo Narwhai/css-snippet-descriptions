@@ -1,0 +1,26 @@
+{
+  "name": "css-snippet-descriptions",
+  "version": "0.1.0",
+  "description": "Add editable descriptions to CSS snippets using portable header comments.",
+  "main": "main.js",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs production",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-obsidianmd": "^0.6.0",
+    "globals": "^17.14.0",
+    "jiti": "^2.7.0",
+    "obsidian": "^1.14.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0"
+  }
+}
