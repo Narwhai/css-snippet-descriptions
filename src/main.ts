@@ -146,6 +146,15 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
   }
 
+  private getCachedSnippetItems(): HTMLElement | null {
+    const items = this.snippetItems;
+    const modal = this.settingsModal;
+    if (items === null || modal === null || !items.isConnected || !modal.contains(items)) {
+      return null;
+    }
+    return items;
+  }
+
   private findSnippetItems(modal: HTMLElement): HTMLElement | null {
     if (modal.querySelector(".vertical-tab-nav-item.is-active[data-setting-id=\"appearance\"]") === null) {
       return null;
@@ -206,7 +215,6 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
         attr: {
           type: "button",
           "aria-label": accessibleName,
-          title: accessibleName,
           "data-css-snippet-description-edit": "",
         },
       });
@@ -214,7 +222,6 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
 
     button.setAttribute("aria-label", accessibleName);
-    button.setAttribute("title", accessibleName);
     const toggleLabel = control.querySelector("label.checkbox-container");
     if (isHTMLElement(toggleLabel) && button.previousElementSibling !== toggleLabel) {
       toggleLabel.after(button);
@@ -317,7 +324,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     if (this.isDisposed || !row.isConnected || modal === null || !modal.contains(row)) {
       return false;
     }
-    const items = this.findSnippetItems(modal);
+    const items = this.getCachedSnippetItems();
     return items !== null && items.contains(row) && this.getSnippetName(row) === name;
   }
 
@@ -326,7 +333,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     if (modal === null || !modal.isConnected) {
       return false;
     }
-    const items = this.findSnippetItems(modal);
+    const items = this.getCachedSnippetItems();
     if (items === null) {
       return false;
     }
@@ -412,8 +419,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
     this.descriptionRevision++;
     this.descriptionCache.set(name, description);
-    const modal = this.settingsModal;
-    const items = modal === null ? null : this.findSnippetItems(modal);
+    const items = this.getCachedSnippetItems();
     if (items === null) {
       return;
     }
@@ -482,7 +488,6 @@ function isSafeSnippetName(name: string): boolean {
     && name !== ".."
     && !name.includes("/")
     && !name.includes("\\")
-    && !name.includes(":")
     && !containsControlCharacters(name);
 }
 

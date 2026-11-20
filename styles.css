@@ -6,3 +6,8 @@
 .css-snippet-description-error {
   color: var(--text-error);
 }
+
+/* Mirrors Obsidian's Edit bookmark modal: the text input fills the setting control. */
+.css-snippet-description-modal .setting-item-control input[type="text"] {
+  width: 100%;
+}

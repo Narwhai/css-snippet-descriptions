@@ -8,8 +8,8 @@ export class CssDescriptionError extends Error {
 interface DescriptionComment {
   readonly commentStart: number;
   readonly commentEnd: number;
-  readonly lineStart: number;
-  readonly lineEnd: number;
+  readonly removeStart: number;
+  readonly removeEnd: number;
   readonly description: string;
 }
 
@@ -88,14 +88,19 @@ function scanHeader(css: string): HeaderScan {
     const lineContentEnd = skipHorizontalWhitespace(css, commentEnd);
     const lineEnd = includeLineEnding(css, lineContentEnd);
     const followingCharacter = css[lineContentEnd];
-    const isStandalone = /^[ \t]*$/.test(css.slice(lineStart, commentStart))
-      && (followingCharacter === undefined || followingCharacter === "\r" || followingCharacter === "\n");
+    const endsLine = followingCharacter === undefined || followingCharacter === "\r" || followingCharacter === "\n";
+    const isStandalone = /^[ \t]*$/.test(css.slice(lineStart, commentStart)) && endsLine;
     const commentText = css.slice(commentStart, commentEnd);
-    const descriptionMatch = isStandalone ? DESCRIPTION_COMMENT.exec(commentText) : null;
+    const descriptionMatch = DESCRIPTION_COMMENT.exec(commentText);
     const description = descriptionMatch?.[1];
 
     if (typeof description === "string") {
-      comments.push({ commentStart, commentEnd, lineStart, lineEnd, description: description.trim() });
+      const removeRange = isStandalone
+        ? { removeStart: lineStart, removeEnd: lineEnd }
+        : endsLine
+          ? { removeStart: findHorizontalWhitespaceStart(css, commentStart), removeEnd: commentEnd }
+          : { removeStart: commentStart, removeEnd: lineContentEnd };
+      comments.push({ commentStart, commentEnd, ...removeRange, description: description.trim() });
     }
 
     cursor = commentEnd;
@@ -137,6 +142,14 @@ function skipHorizontalWhitespace(css: string, offset: number): number {
   return cursor;
 }
 
+function findHorizontalWhitespaceStart(css: string, offset: number): number {
+  let cursor = offset;
+  while (cursor > 0 && (css[cursor - 1] === " " || css[cursor - 1] === "\t")) {
+    cursor--;
+  }
+  return cursor;
+}
+
 function includeLineEnding(css: string, offset: number): number {
   if (css.startsWith("\r\n", offset)) {
     return offset + 2;
@@ -155,8 +168,8 @@ function removeDescriptionComments(css: string, comments: ReadonlyArray<Descript
   const output: string[] = [];
   let cursor = 0;
   for (const comment of comments) {
-    output.push(css.slice(cursor, comment.lineStart));
-    cursor = comment.lineEnd;
+    output.push(css.slice(cursor, comment.removeStart));
+    cursor = comment.removeEnd;
   }
   output.push(css.slice(cursor));
   return output.join("");

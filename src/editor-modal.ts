@@ -1,4 +1,4 @@
-import { App, Modal, Setting } from "obsidian";
+import { App, Modal, Notice, Setting } from "obsidian";
 import { normalizeCssDescription, writeCssDescription } from "./css-description";
 
 interface EditorModalOptions {
@@ -20,6 +20,7 @@ export class CssSnippetDescriptionEditorModal extends Modal {
   private setSaveDisabled: ((disabled: boolean) => void) | null = null;
   private isSaving = false;
   private isClosed = false;
+  private hasNotifiedClosed = false;
 
   constructor(options: EditorModalOptions) {
     super(options.app);
@@ -32,6 +33,7 @@ export class CssSnippetDescriptionEditorModal extends Modal {
 
   override onOpen(): void {
     this.setTitle("Edit CSS snippet description");
+    this.modalEl.addClass("css-snippet-description-modal");
     new Setting(this.contentEl)
       .setName(this.snippetName)
       .setDesc("Leave the description blank to remove its CSS comment.");
@@ -39,10 +41,15 @@ export class CssSnippetDescriptionEditorModal extends Modal {
     new Setting(this.contentEl)
       .setName("Description")
       .setDesc("Use one line of plain text.")
-      .addTextArea((component) => {
+      .addText((component) => {
         component.setValue(this.value);
-        component.inputEl.rows = 2;
         component.inputEl.setAttribute("aria-label", "Description");
+        component.inputEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" && !event.isComposing) {
+            event.preventDefault();
+            void this.save();
+          }
+        });
         component.inputEl.focus();
         component.onChange((value) => {
           this.value = value;
@@ -73,7 +80,9 @@ export class CssSnippetDescriptionEditorModal extends Modal {
   override onClose(): void {
     this.isClosed = true;
     this.contentEl.empty();
-    this.onClosed();
+    if (!this.isSaving) {
+      this.notifyClosed();
+    }
   }
 
   private async save(): Promise<void> {
@@ -95,18 +104,22 @@ export class CssSnippetDescriptionEditorModal extends Modal {
 
     try {
       await this.app.vault.adapter.process(this.snippetPath, (css) => writeCssDescription(css, description));
-      if (this.isClosed) {
-        return;
-      }
       this.onSaved(description.length === 0 ? null : description);
-      this.close();
-    } catch (error) {
       if (!this.isClosed) {
-        this.showError(`Could not save the description for ${this.snippetName}: ${errorMessage(error)}`);
+        this.close();
+      }
+    } catch (error) {
+      const message = `Could not save the description for ${this.snippetName}: ${errorMessage(error)}`;
+      if (this.isClosed) {
+        new Notice(message);
+      } else {
+        this.showError(message);
       }
     } finally {
-      if (!this.isClosed) {
-        this.isSaving = false;
+      this.isSaving = false;
+      if (this.isClosed) {
+        this.notifyClosed();
+      } else {
         this.setSaveDisabled?.(false);
       }
     }
@@ -118,6 +131,14 @@ export class CssSnippetDescriptionEditorModal extends Modal {
     }
     this.errorEl.setText(message);
     this.errorEl.hidden = message.length === 0;
+  }
+
+  private notifyClosed(): void {
+    if (this.hasNotifiedClosed) {
+      return;
+    }
+    this.hasNotifiedClosed = true;
+    this.onClosed();
   }
 }
 

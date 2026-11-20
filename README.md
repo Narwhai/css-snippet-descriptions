@@ -1,6 +1,6 @@
 # CSS Snippet Descriptions
 
-Add a portable description to a CSS snippet with a standalone header comment:
+Add a portable description to a CSS snippet with a header comment:
 
 ```css
 /* @description: Adds alternating row colors. */

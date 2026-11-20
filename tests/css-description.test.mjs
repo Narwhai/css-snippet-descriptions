@@ -82,3 +82,21 @@ test("does not match description-looking text inside a leading license comment",
   const css = "/* License notes: @description: not metadata */\nbody {}\n";
   assert.equal(readCssDescription(css), undefined);
 });
+
+test("reads, updates, and clears a description sharing a line with a leading @charset", () => {
+  const css = "@charset \"UTF-8\"; /* @description: x */\nbody {}\n";
+  assert.equal(readCssDescription(css), "x");
+  assert.equal(writeCssDescription(css, ""), "@charset \"UTF-8\";\nbody {}\n");
+  const updated = writeCssDescription(css, "y");
+  assert.equal(updated, "@charset \"UTF-8\"; /* @description: y */\nbody {}\n");
+  assert.equal(updated.split("@description:").length - 1, 1);
+});
+
+test("reads, updates, and clears a description sharing a line with a rule", () => {
+  const css = "/* @description: x */ body {}\n";
+  assert.equal(readCssDescription(css), "x");
+  assert.equal(writeCssDescription(css, ""), "body {}\n");
+  const updated = writeCssDescription(css, "y");
+  assert.equal(updated, "/* @description: y */ body {}\n");
+  assert.equal(updated.split("@description:").length - 1, 1);
+});
