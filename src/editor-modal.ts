@@ -33,12 +33,12 @@ export class CssSnippetDescriptionEditorModal extends Modal {
 
   override onOpen(): void {
     this.setTitle("Edit CSS snippet description");
-    this.modalEl.addClass("css-snippet-description-modal");
     new Setting(this.contentEl)
       .setName(this.snippetName)
       .setDesc("Leave the description blank to remove its CSS comment.");
 
     new Setting(this.contentEl)
+      .setClass("css-snippet-description-input-setting")
       .setName("Description")
       .setDesc("Use one line of plain text.")
       .addText((component) => {

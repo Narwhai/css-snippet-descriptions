@@ -7,7 +7,18 @@
   color: var(--text-error);
 }
 
-/* Mirrors Obsidian's Edit bookmark modal: the text input fills the setting control. */
-.css-snippet-description-modal .setting-item-control input[type="text"] {
+/* Stack the input under its label, mirroring Obsidian's phone layout for modal settings. */
+.css-snippet-description-input-setting {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--size-4-2);
+}
+
+.css-snippet-description-input-setting .setting-item-control {
   width: 100%;
+}
+
+.css-snippet-description-input-setting .setting-item-control input[type="text"] {
+  width: 100%;
+  margin: 0;
 }
