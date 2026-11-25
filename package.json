@@ -1,6 +1,6 @@
 {
   "name": "css-snippet-descriptions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Add editable descriptions to CSS snippets using portable header comments.",
   "main": "main.js",
   "type": "module",
