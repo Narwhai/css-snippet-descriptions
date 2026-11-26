@@ -1,7 +1,7 @@
 {
   "id": "css-snippet-descriptions",
   "name": "CSS Snippet Descriptions",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.12.6",
   "description": "Add editable descriptions to CSS snippets using portable header comments.",
   "author": "Roman Soriano",
