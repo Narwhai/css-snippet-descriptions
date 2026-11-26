@@ -14,6 +14,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
   private bodyObserver: MutationObserver | null = null;
   private settingsObserver: MutationObserver | null = null;
   private settingsModal: HTMLElement | null = null;
+  private settingsNavigation: Element | null = null;
   private snippetItems: HTMLElement | null = null;
   private editorModal: CssSnippetDescriptionEditorModal | null = null;
   private descriptionRevision = 0;
@@ -82,6 +83,8 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
     this.detachSettingsModal();
     this.settingsModal = modal;
+    // Phones detach this header when a settings tab opens, but still update its active item.
+    this.settingsNavigation = modal.querySelector(".vertical-tab-header");
     this.settingsObserver = new MutationObserver(() => this.debouncedRefresh());
     this.settingsObserver.observe(modal, {
       attributes: true,
@@ -96,6 +99,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     this.settingsObserver?.disconnect();
     this.settingsObserver = null;
     this.settingsModal = null;
+    this.settingsNavigation = null;
     this.openingRows.clear();
     this.setSnippetItems(null);
   }
@@ -156,7 +160,10 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
   }
 
   private findSnippetItems(modal: HTMLElement): HTMLElement | null {
-    if (modal.querySelector(".vertical-tab-nav-item.is-active[data-setting-id=\"appearance\"]") === null) {
+    // A tab already open when the plugin loaded may not have its header attached yet.
+    this.settingsNavigation ??= modal.querySelector(".vertical-tab-header");
+    const navigation = this.settingsNavigation ?? modal;
+    if (navigation.querySelector(".vertical-tab-nav-item.is-active[data-setting-id=\"appearance\"]") === null) {
       return null;
     }
 
@@ -456,6 +463,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     this.editorModal?.close();
     this.editorModal = null;
     this.settingsModal = null;
+    this.settingsNavigation = null;
     this.snippetItems = null;
     this.descriptionCache.clear();
     this.pendingReads.clear();

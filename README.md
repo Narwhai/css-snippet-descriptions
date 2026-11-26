@@ -10,9 +10,9 @@ A plugin to edit/display CSS snippet descriptions directly within the CSS snippe
 
 ## Instructions 
 
-1. In **Settings → Appearance → CSS snippets**, you will notice a new "Edit" button next to the toggle for enabling/disabling a snippet. 
-2. Clicking it will bring up a modal with an input field where you can enter a description for the Snippet
-3. When you click Save, the description you entered will now be visible underneath the snippet name. Additionally, the description is added to the CSS snippet file itself, like so:
+1. On desktop or mobile, go to **Settings → Appearance → CSS snippets**. Look for the pencil button next to a snippet’s toggle.
+2. Click or tap the pencil to enter a description.
+3. Select **Save**. The description appears beneath the snippet name and is saved in the CSS file itself, like so:
 
 ```css
 /* @description: Adds alternating row colors. */

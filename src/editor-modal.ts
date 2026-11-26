@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Setting } from "obsidian";
+import { App, Modal, Notice, Platform, Setting } from "obsidian";
 import { normalizeCssDescription, writeCssDescription } from "./css-description";
 
 interface EditorModalOptions {
@@ -50,7 +50,11 @@ export class CssSnippetDescriptionEditorModal extends Modal {
             void this.save();
           }
         });
-        component.inputEl.focus();
+        if (Platform.isMobile) {
+          component.inputEl.setAttribute("enterkeyhint", "done");
+        } else {
+          component.inputEl.focus();
+        }
         component.onChange((value) => {
           this.value = value;
         });
