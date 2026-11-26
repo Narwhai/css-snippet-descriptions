@@ -11,9 +11,14 @@ const SETTINGS_MODAL_SELECTOR = ".modal.mod-settings";
 const DESCRIPTION_BUTTON_SELECTOR = "button[data-css-snippet-description-edit]";
 const DESCRIPTION_TEXT_SELECTOR = ".css-snippet-description-text";
 
+interface CachedDescription {
+  readonly text: string | null;
+  readonly revision: number;
+}
+
 export default class CssSnippetDescriptionsPlugin extends Plugin {
-  private readonly descriptionCache = new Map<string, string | null>();
-  private readonly pendingReads = new Map<string, Promise<void>>();
+  private readonly descriptionCache = new Map<string, CachedDescription>();
+  private readonly pendingReads = new Set<string>();
   private readonly openingRows = new Set<HTMLElement>();
   private settingsObserver: MutationObserver | null = null;
   private settingsModal: HTMLElement | null = null;
@@ -48,14 +53,16 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     // Phones detach this header while viewing a tab, including when the plugin is reloaded.
     this.settingsNavigation = settings?.tabHeadersEl ?? null;
     this.registerDomEvent(modal, "click", (event) => this.handleSettingsClick(event), true);
-    this.settingsObserver = new MutationObserver(() => this.debouncedRefresh());
+    // Obsidian can replace the snippet rows on a toggle. Decorate the new rows
+    // in the mutation microtask so they don't paint without the buttons and text.
+    this.settingsObserver = new MutationObserver(() => this.refreshSettings());
     this.settingsObserver.observe(modal, {
       attributes: true,
       attributeFilter: ["class", "style"],
       childList: true,
       subtree: true,
     });
-    this.debouncedRefresh();
+    this.refreshSettings();
   }
 
   private refreshSettings(): void {
@@ -63,13 +70,15 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
       return;
     }
     const modal = this.settingsModal;
+    const items = modal?.isConnected ? this.findSnippetItems(modal) : null;
+    if (items === null && this.snippetItems !== null) {
+      // Recheck files on the next visit to Appearance, without discarding text.
+      this.descriptionRevision++;
+    }
+    this.snippetItems = items;
     if (modal === null || !modal.isConnected) {
-      this.setSnippetItems(null);
       return;
     }
-
-    const items = this.findSnippetItems(modal);
-    this.setSnippetItems(items);
     if (items === null) {
       this.removePluginElements(modal);
       return;
@@ -88,20 +97,13 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
       }
 
       this.ensureEditButton(candidate, name);
-      if (this.descriptionCache.has(name)) {
-        this.setRowDescription(candidate, this.descriptionCache.get(name) ?? null);
-      } else {
+      const cached = this.descriptionCache.get(name);
+      if (cached !== undefined) {
+        this.setRowDescription(candidate, cached.text);
+      }
+      if (cached?.revision !== this.descriptionRevision) {
         this.loadDescriptionForRow(candidate, name);
       }
-    }
-  }
-
-  private setSnippetItems(items: HTMLElement | null): void {
-    if (this.snippetItems !== items) {
-      // The native reload button can rebuild this list without emitting css-change.
-      this.snippetItems = items;
-      this.descriptionRevision++;
-      this.descriptionCache.clear();
     }
   }
 
@@ -243,8 +245,8 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
 
     const revision = this.descriptionRevision;
-    const request = this.readAndDisplayDescription(row, name, path, revision);
-    this.pendingReads.set(name, request);
+    this.pendingReads.add(name);
+    void this.readAndDisplayDescription(row, name, path, revision);
   }
 
   private async readAndDisplayDescription(
@@ -253,29 +255,32 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     path: string,
     revision: number,
   ): Promise<void> {
+    let text: string | null = null;
     try {
       const css = await this.app.vault.adapter.read(path);
-      if (revision !== this.descriptionRevision || !this.isCurrentSnippetRow(row, name)) {
-        return;
-      }
-      const description = readCssDescription(css);
-      const displayDescription = description === undefined || description.length === 0 ? null : description;
-      this.descriptionCache.set(name, displayDescription);
-      this.setRowDescription(row, displayDescription);
+      text = readCssDescription(css) || null;
     } catch (error) {
-      if (revision === this.descriptionRevision && this.isCurrentSnippetRow(row, name)) {
-        this.descriptionCache.set(name, null);
-        this.setRowDescription(row, null);
+      if (!this.isDisposed && revision === this.descriptionRevision) {
         console.error(`Could not read the description for CSS snippet ${name}.`, error);
       }
     } finally {
       this.pendingReads.delete(name);
-      if (!this.isDisposed && (
-        revision !== this.descriptionRevision
-        || (!this.isCurrentSnippetRow(row, name) && this.hasCurrentRowNamed(name))
-      )) {
-        this.debouncedRefresh();
-      }
+    }
+
+    if (this.isDisposed) {
+      return;
+    }
+    if (revision !== this.descriptionRevision) {
+      this.debouncedRefresh();
+      return;
+    }
+
+    // A read belongs to the snippet, not to the row Obsidian happened to render.
+    this.descriptionCache.set(name, { text, revision });
+    if (this.isCurrentSnippetRow(row, name)) {
+      this.setRowDescription(row, text);
+    } else {
+      this.updateVisibleDescription(name, text);
     }
   }
 
@@ -286,23 +291,6 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     }
     const items = this.getCachedSnippetItems();
     return items !== null && items.contains(row) && this.getSnippetName(row) === name;
-  }
-
-  private hasCurrentRowNamed(name: string): boolean {
-    const modal = this.settingsModal;
-    if (modal === null || !modal.isConnected) {
-      return false;
-    }
-    const items = this.getCachedSnippetItems();
-    if (items === null) {
-      return false;
-    }
-    for (const row of Array.from(items.children)) {
-      if (isHTMLElement(row) && row.matches(".setting-item.mod-toggle") && this.getSnippetName(row) === name) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private handleSettingsClick(event: MouseEvent): void {
@@ -378,7 +366,11 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
       return;
     }
     this.descriptionRevision++;
-    this.descriptionCache.set(name, description);
+    this.descriptionCache.set(name, { text: description, revision: this.descriptionRevision });
+    this.updateVisibleDescription(name, description);
+  }
+
+  private updateVisibleDescription(name: string, description: string | null): void {
     const items = this.getCachedSnippetItems();
     if (items === null) {
       return;
@@ -394,8 +386,8 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     if (this.isDisposed) {
       return;
     }
+    // Mark descriptions stale, but keep rendering them while files are reread.
     this.descriptionRevision++;
-    this.descriptionCache.clear();
     this.debouncedRefresh();
   }
 
