@@ -3,6 +3,11 @@
   margin-top: var(--size-4-1);
 }
 
+.is-mobile .css-snippet-description-edit {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .css-snippet-description-error {
   color: var(--text-error);
 }

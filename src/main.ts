@@ -1,7 +1,11 @@
-/* global activeDocument -- activeDocument is a runtime global in Obsidian's popout-aware DOM API */
-import { debounce, normalizePath, Notice, Plugin, setIcon } from "obsidian";
+import { type App, debounce, normalizePath, Notice, Plugin, setIcon } from "obsidian";
 import { readCssDescription } from "./css-description";
 import { CssSnippetDescriptionEditorModal } from "./editor-modal";
+
+// Obsidian does not expose a public hook for its built-in Settings window.
+interface AppWithSettings extends App {
+  setting?: { modalEl?: HTMLElement; tabHeadersEl?: HTMLElement };
+}
 
 const SETTINGS_MODAL_SELECTOR = ".modal.mod-settings";
 const DESCRIPTION_BUTTON_SELECTOR = "button[data-css-snippet-description-edit]";
@@ -11,9 +15,9 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
   private readonly descriptionCache = new Map<string, string | null>();
   private readonly pendingReads = new Map<string, Promise<void>>();
   private readonly openingRows = new Set<HTMLElement>();
-  private bodyObserver: MutationObserver | null = null;
   private settingsObserver: MutationObserver | null = null;
   private settingsModal: HTMLElement | null = null;
+  private settingsNavigation: Element | null = null;
   private snippetItems: HTMLElement | null = null;
   private editorModal: CssSnippetDescriptionEditorModal | null = null;
   private descriptionRevision = 0;
@@ -33,55 +37,17 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
       return;
     }
 
-    const body = activeDocument.body;
-    this.registerDomEvent(body, "click", (event) => this.handleSettingsClick(event), true);
-    this.bodyObserver = new MutationObserver((records) => this.handleBodyMutations(records, body));
-    this.bodyObserver.observe(body, { childList: true });
-
-    const existingModal = activeDocument.querySelector(SETTINGS_MODAL_SELECTOR);
-    if (isHTMLElement(existingModal)) {
-      this.attachSettingsModal(existingModal);
-    }
-  }
-
-  private handleBodyMutations(records: MutationRecord[], body: HTMLElement): void {
-    if (this.settingsModal !== null && !this.settingsModal.isConnected) {
-      this.detachSettingsModal();
-    }
-
-    for (const record of records) {
-      if (record.target !== body) {
-        continue;
-      }
-      for (const addedNode of Array.from(record.addedNodes)) {
-        if (!isHTMLElement(addedNode)) {
-          continue;
-        }
-        const modal = this.findSettingsModal(addedNode);
-        if (modal !== null) {
-          this.attachSettingsModal(modal);
-        }
-      }
-    }
-  }
-
-  private findSettingsModal(node: HTMLElement): HTMLElement | null {
-    if (node.matches(SETTINGS_MODAL_SELECTOR)) {
-      return node;
-    }
-    if (!node.matches(".modal-container")) {
-      return null;
-    }
-    const modal = node.querySelector(SETTINGS_MODAL_SELECTOR);
-    return isHTMLElement(modal) ? modal : null;
-  }
-
-  private attachSettingsModal(modal: HTMLElement): void {
-    if (this.settingsModal === modal) {
+    const settings = (this.app as AppWithSettings).setting;
+    const modal = settings?.modalEl;
+    if (!modal?.matches(SETTINGS_MODAL_SELECTOR)) {
       return;
     }
-    this.detachSettingsModal();
+
+    // The same modal moves into a separate document on desktop and is reused when reopened.
     this.settingsModal = modal;
+    // Phones detach this header while viewing a tab, including when the plugin is reloaded.
+    this.settingsNavigation = settings?.tabHeadersEl ?? null;
+    this.registerDomEvent(modal, "click", (event) => this.handleSettingsClick(event), true);
     this.settingsObserver = new MutationObserver(() => this.debouncedRefresh());
     this.settingsObserver.observe(modal, {
       attributes: true,
@@ -92,20 +58,13 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     this.debouncedRefresh();
   }
 
-  private detachSettingsModal(): void {
-    this.settingsObserver?.disconnect();
-    this.settingsObserver = null;
-    this.settingsModal = null;
-    this.openingRows.clear();
-    this.setSnippetItems(null);
-  }
-
   private refreshSettings(): void {
     if (this.isDisposed) {
       return;
     }
     const modal = this.settingsModal;
     if (modal === null || !modal.isConnected) {
+      this.setSnippetItems(null);
       return;
     }
 
@@ -156,7 +115,8 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
   }
 
   private findSnippetItems(modal: HTMLElement): HTMLElement | null {
-    if (modal.querySelector(".vertical-tab-nav-item.is-active[data-setting-id=\"appearance\"]") === null) {
+    const navigation = this.settingsNavigation ?? modal;
+    if (navigation.querySelector(".vertical-tab-nav-item.is-active[data-setting-id=\"appearance\"]") === null) {
       return null;
     }
 
@@ -444,8 +404,6 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
       return;
     }
     this.isDisposed = true;
-    this.bodyObserver?.disconnect();
-    this.bodyObserver = null;
     this.settingsObserver?.disconnect();
     this.settingsObserver = null;
 
@@ -456,6 +414,7 @@ export default class CssSnippetDescriptionsPlugin extends Plugin {
     this.editorModal?.close();
     this.editorModal = null;
     this.settingsModal = null;
+    this.settingsNavigation = null;
     this.snippetItems = null;
     this.descriptionCache.clear();
     this.pendingReads.clear();
