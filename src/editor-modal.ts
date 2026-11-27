@@ -29,6 +29,8 @@ export class CssSnippetDescriptionEditorModal extends Modal {
     this.value = options.initialDescription;
     this.onSaved = options.onSaved;
     this.onClosed = options.onClosed;
+    // Lets mobile styles keep the modal above the on-screen keyboard.
+    this.containerEl.addClass("css-snippet-description-modal-container");
   }
 
   override onOpen(): void {

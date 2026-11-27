@@ -8,6 +8,17 @@
   min-height: 44px;
 }
 
+/* Modals sit outside .app-container, which is the only part Obsidian shrinks for the
+   on-screen keyboard. Center the editor in the space above the keyboard instead. */
+.is-mobile .css-snippet-description-modal-container {
+  box-sizing: border-box;
+  padding-bottom: var(--keyboard-height);
+}
+
+.is-mobile .css-snippet-description-modal-container .modal {
+  max-height: calc(100% - var(--safe-area-inset-top) - var(--size-4-4));
+}
+
 .css-snippet-description-error {
   color: var(--text-error);
 }
